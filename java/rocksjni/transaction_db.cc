@@ -305,7 +305,7 @@ jobject Java_org_rocksdb_TransactionDB_getLockStatusData(
   }
 
   const rocksdb::HashMapJni::FnMapKV<const int32_t, const rocksdb::KeyLockInfo> fn_map_kv =
-      [env, txn_db, &lock_status_data](const std::pair<const int32_t, const rocksdb::KeyLockInfo>& pair) {
+      [env](const std::pair<const int32_t, const rocksdb::KeyLockInfo>& pair) {
           const jobject jlong_column_family_id =
               rocksdb::LongJni::valueOf(env, pair.first);
           if (jlong_column_family_id == nullptr) {
