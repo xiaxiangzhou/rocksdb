@@ -9,6 +9,7 @@ NATIVE_JAVA_CLASSES = org.rocksdb.AbstractCompactionFilter\
 	org.rocksdb.ClockCache\
 	org.rocksdb.CassandraCompactionFilter\
 	org.rocksdb.CassandraValueMergeOperator\
+	org.rocksdb.CassandraPartitionMetaMergeOperator\
 	org.rocksdb.ColumnFamilyHandle\
 	org.rocksdb.ColumnFamilyOptions\
 	org.rocksdb.CompactionOptionsFIFO\
