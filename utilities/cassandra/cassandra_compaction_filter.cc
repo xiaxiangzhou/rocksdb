@@ -33,7 +33,7 @@ PartitionDeletion CassandraCompactionFilter::GetPartitionDelete(
   ColumnFamilyHandle* meta_cf_handle = meta_cf_handle_.load();
 
   auto it = unique_ptr<Iterator>(
-    meta_db->NewIterator(rocksdb::ReadOptions(), meta_cf_handle));
+      meta_db->NewIterator(rocksdb::ReadOptions(), meta_cf_handle));
   // partition meta key is encoded token+paritionkey
   it->SeekForPrev(key);
   if (!it->Valid()) {
