@@ -229,7 +229,7 @@ int MemTable::KeyComparator::operator()(const char* prefix_len_key1,
 }
 
 int MemTable::KeyComparator::operator()(const char* prefix_len_key,
-                                        const Slice& key)
+                                        const KeyComparator::DecodedType& key)
     const {
   // Internal keys are encoded as length-prefixed strings.
   Slice a = GetLengthPrefixedSlice(prefix_len_key);
@@ -479,12 +479,12 @@ bool MemTable::Add(SequenceNumber s, ValueType type,
         insert_with_hint_prefix_extractor_->InDomain(key_slice)) {
       Slice prefix = insert_with_hint_prefix_extractor_->Transform(key_slice);
       bool res = table->InsertKeyWithHint(handle, &insert_hints_[prefix]);
-      if (!res) {
+      if (UNLIKELY(!res)) {
         return res;
       }
     } else {
       bool res = table->InsertKey(handle);
-      if (!res) {
+      if (UNLIKELY(!res)) {
         return res;
       }
     }
@@ -520,7 +520,7 @@ bool MemTable::Add(SequenceNumber s, ValueType type,
     UpdateFlushState();
   } else {
     bool res = table->InsertKeyConcurrently(handle);
-    if (!res) {
+    if (UNLIKELY(!res)) {
       return res;
     }
 
@@ -696,7 +696,7 @@ static bool SaveValue(void* arg, const char* entry) {
         *(s->merge_in_progress) = true;
         merge_context->PushOperand(
             v, s->inplace_update_support == false /* operand_pinned */);
-        if (merge_operator->ShouldMerge(merge_context->GetOperands())) {
+        if (merge_operator->ShouldMerge(merge_context->GetOperandsDirectionBackward())) {
           *(s->status) = MergeHelper::TimedFullMerge(
               merge_operator, s->key->user_key(), nullptr,
               merge_context->GetOperands(), s->value, s->logger, s->statistics,

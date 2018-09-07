@@ -16,7 +16,7 @@
 #    See thirdparty.inc for more information.
 #        sample command: cmake -G "Visual Studio 15 Win64" -DWITH_GFLAGS=1 -DWITH_SNAPPY=1 -DWITH_JEMALLOC=1 -DWITH_JNI=1 ..
 # 4. Then build the project in debug mode (you may want to add /m[:<N>] flag to run msbuild in <N> parallel threads
-#                                          or simply /m ot use all avail cores)
+#                                          or simply /m to use all avail cores)
 #        msbuild rocksdb.sln
 #
 #        rocksdb.sln build features exclusions of test only code in Release. If you build ALL_BUILD then everything
@@ -64,9 +64,10 @@ else()
       find_package(JeMalloc REQUIRED)
       add_definitions(-DROCKSDB_JEMALLOC -DJEMALLOC_NO_DEMANGLE)
       include_directories(${JEMALLOC_INCLUDE_DIR})
+      list(APPEND THIRDPARTY_LIBS ${JEMALLOC_LIBRARIES})
     endif()
   endif()
-  
+
   # No config file for this
   option(WITH_GFLAGS "build with GFlags" ON)
   if(WITH_GFLAGS)
@@ -132,19 +133,17 @@ endif()
 
 string(REGEX REPLACE "[^0-9a-f]+" "" GIT_SHA "${GIT_SHA}")
 
-set(SH_CMD "sh")
-execute_process(COMMAND
-  ${SH_CMD} -c "build_tools/version.sh full"
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  OUTPUT_VARIABLE ROCKSDB_VERSION
-)
-string(STRIP "${ROCKSDB_VERSION}" ROCKSDB_VERSION)
-execute_process(COMMAND
-  ${SH_CMD} -c "build_tools/version.sh major"
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  OUTPUT_VARIABLE ROCKSDB_VERSION_MAJOR
-)
-string(STRIP "${ROCKSDB_VERSION_MAJOR}" ROCKSDB_VERSION_MAJOR)
+
+# Read rocksdb version from version.h header file.
+file(READ include/rocksdb/version.h version_header_file)
+string(REGEX MATCH "#define ROCKSDB_MAJOR ([0-9]+)" _ ${version_header_file})
+set(ROCKSDB_VERSION_MAJOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define ROCKSDB_MINOR ([0-9]+)" _ ${version_header_file})
+set(ROCKSDB_VERSION_MINOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define ROCKSDB_PATCH ([0-9]+)" _ ${version_header_file})
+set(ROCKSDB_VERSION_PATCH ${CMAKE_MATCH_1})
+set(ROCKSDB_VERSION ${ROCKSDB_VERSION_MAJOR}.${ROCKSDB_VERSION_MINOR}.${ROCKSDB_VERSION_PATCH})
+
 
 option(WITH_MD_LIBRARY "build with MD" ON)
 if(WIN32 AND MSVC)
@@ -229,6 +228,7 @@ int main() {
 unset(CMAKE_REQUIRED_FLAGS)
 if(HAVE_SSE42)
   add_definitions(-DHAVE_SSE42)
+  add_definitions(-DHAVE_PCLMUL)
 elseif(FORCE_SSE42)
   message(FATAL_ERROR "FORCE_SSE42=ON but unable to compile with SSE4.2 enabled")
 endif()
@@ -285,18 +285,26 @@ if(WITH_UBSAN)
   endif()
 endif()
 
-find_package(NUMA)
-if(NUMA_FOUND)
+option(WITH_NUMA "build with NUMA policy support" OFF)
+if(WITH_NUMA)
+  find_package(NUMA REQUIRED)
   add_definitions(-DNUMA)
   include_directories(${NUMA_INCLUDE_DIR})
   list(APPEND THIRDPARTY_LIBS ${NUMA_LIBRARIES})
 endif()
 
-find_package(TBB)
-if(TBB_FOUND)
+option(WITH_TBB "build with Threading Building Blocks (TBB)" OFF)
+if(WITH_TBB)
+  find_package(TBB REQUIRED)
   add_definitions(-DTBB)
   include_directories(${TBB_INCLUDE_DIR})
   list(APPEND THIRDPARTY_LIBS ${TBB_LIBRARIES})
+endif()
+
+# Stall notifications eat some performance from inserts
+option(DISABLE_STALL_NOTIF "Build with stall notifications" OFF)
+if(DISABLE_STALL_NOTIF)
+  add_definitions(-DROCKSDB_DISABLE_STALL_NOTIFICATION)
 endif()
 
 # Used to run CI build and tests so we can run faster
@@ -306,6 +314,22 @@ if(DEFINED OPTDBG)
    set(OPTIMIZE_DEBUG ${OPTDBG})
 else()
    set(OPTIMIZE_DEBUG ${OPTIMIZE_DEBUG_DEFAULT})
+endif()
+
+if(DEFINED USE_RTTI)
+  if(USE_RTTI)
+    message(STATUS "Enabling RTTI")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DROCKSDB_USE_RTTI")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DROCKSDB_USE_RTTI")
+  else()
+    message(STATUS "Disabling RTTI")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-rtti")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-rtti")
+  endif()
+else()
+  message(STATUS "Enabling RTTI in Debug builds only (default)")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DROCKSDB_USE_RTTI")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-rtti")
 endif()
 
 if(MSVC)
@@ -455,6 +479,7 @@ set(SOURCES
         db/flush_scheduler.cc
         db/forward_iterator.cc
         db/internal_stats.cc
+        db/logs_with_prep_tracker.cc
         db/log_reader.cc
         db/log_writer.cc
         db/malloc_stats.cc
@@ -569,6 +594,7 @@ set(SOURCES
         util/status_message.cc
         util/string_util.cc
         util/sync_point.cc
+        util/sync_point_impl.cc
         util/testutil.cc
         util/thread_local.cc
         util/threadpool_imp.cc
@@ -657,8 +683,12 @@ if(WIN32)
     port/win/env_default.cc
     port/win/port_win.cc
     port/win/win_logger.cc
-    port/win/win_thread.cc
+    port/win/win_thread.cc)
+
+if(WITH_XPRESS)
+  list(APPEND SOURCES
     port/win/xpress_win.cc)
+endif()
 
 if(WITH_JEMALLOC)
   list(APPEND SOURCES
@@ -675,6 +705,14 @@ endif()
 set(ROCKSDB_STATIC_LIB rocksdb${ARTIFACT_SUFFIX})
 set(ROCKSDB_SHARED_LIB rocksdb-shared${ARTIFACT_SUFFIX})
 set(ROCKSDB_IMPORT_LIB ${ROCKSDB_SHARED_LIB})
+
+option(WITH_LIBRADOS "Build with librados" OFF)
+if(WITH_LIBRADOS)
+  list(APPEND SOURCES
+    utilities/env_librados.cc)
+  list(APPEND THIRDPARTY_LIBS rados)
+endif()
+
 if(WIN32)
   set(SYSTEM_LIBS ${SYSTEM_LIBS} Shlwapi.lib Rpcrt4.lib)
   set(LIBS ${ROCKSDB_STATIC_LIB} ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
@@ -691,13 +729,6 @@ else()
                         SOVERSION ${ROCKSDB_VERSION_MAJOR}
                         CXX_STANDARD 11
                         OUTPUT_NAME "rocksdb")
-endif()
-
-option(WITH_LIBRADOS "Build with librados" OFF)
-if(WITH_LIBRADOS)
-  list(APPEND SOURCES
-    utilities/env_librados.cc)
-  list(APPEND THIRDPARTY_LIBS rados)
 endif()
 
 add_library(${ROCKSDB_STATIC_LIB} STATIC ${SOURCES})
@@ -814,6 +845,7 @@ if(WITH_TESTS)
         db/db_inplace_update_test.cc
         db/db_io_failure_test.cc
         db/db_iter_test.cc
+        db/db_iter_stress_test.cc
         db/db_iterator_test.cc
         db/db_log_iter_test.cc
         db/db_memtable_test.cc
@@ -832,6 +864,7 @@ if(WITH_TESTS)
         db/db_write_test.cc
         db/dbformat_test.cc
         db/deletefile_test.cc
+        db/obsolete_files_test.cc
         db/external_sst_file_basic_test.cc
         db/external_sst_file_test.cc
         db/fault_injection_test.cc

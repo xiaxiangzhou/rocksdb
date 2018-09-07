@@ -25,7 +25,8 @@ PartitionedFilterBlockBuilder::PartitionedFilterBlockBuilder(
                              filter_bits_builder),
       index_on_filter_block_builder_(index_block_restart_interval),
       p_index_builder_(p_index_builder),
-      filters_in_partition_(0) {
+      filters_in_partition_(0),
+      num_added_(0) {
   filters_per_partition_ =
       filter_bits_builder_->CalculateNumEntry(partition_size);
 }
@@ -47,12 +48,14 @@ void PartitionedFilterBlockBuilder::MaybeCutAFilterBlock() {
   std::string& index_key = p_index_builder_->GetPartitionKey();
   filters.push_back({index_key, filter});
   filters_in_partition_ = 0;
+  Reset();
 }
 
 void PartitionedFilterBlockBuilder::AddKey(const Slice& key) {
   MaybeCutAFilterBlock();
   filter_bits_builder_->AddKey(key);
   filters_in_partition_++;
+  num_added_++;
 }
 
 Slice PartitionedFilterBlockBuilder::Finish(
@@ -163,6 +166,9 @@ bool PartitionedFilterBlockReader::KeyMayMatch(
 bool PartitionedFilterBlockReader::PrefixMayMatch(
     const Slice& prefix, uint64_t block_offset, const bool no_io,
     const Slice* const const_ikey_ptr) {
+#ifdef NDEBUG
+  (void)block_offset;
+#endif
   assert(const_ikey_ptr != nullptr);
   assert(block_offset == kNotValid);
   if (!prefix_extractor_) {

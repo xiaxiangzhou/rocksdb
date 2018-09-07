@@ -185,9 +185,9 @@ class MergeOperator {
 
   // Determines whether the MergeOperator can be called with just a single
   // merge operand.
-  // Override and return true for allowing a single operand. FullMergeV2 and
-  // PartialMerge/PartialMergeMulti should be implemented accordingly to handle
-  // a single operand.
+  // Override and return true for allowing a single operand. Both FullMergeV2
+  // and PartialMerge/PartialMergeMulti should be overridden and implemented
+  // correctly to handle a single operand.
   virtual bool AllowSingleOperand() const { return false; }
 
   // Allows to control when to invoke a full merge during Get.
@@ -195,6 +195,11 @@ class MergeOperator {
   // during a point lookup, thereby helping in limiting the number of levels to
   // read from.
   // Doesn't help with iterators.
+  //
+  // Note: the merge operands are passed to this function in the reversed order
+  // relative to how they were merged (passed to FullMerge or FullMergeV2)
+  // for performance reasons, see also:
+  // https://github.com/facebook/rocksdb/issues/3865
   virtual bool ShouldMerge(const std::vector<Slice>& /*operands*/) const {
     return false;
   }
