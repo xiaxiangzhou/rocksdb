@@ -1318,7 +1318,7 @@ void Java_org_rocksdb_RocksDB_deleteRange__J_3BII_3BII(
  * Signature: (J[BII[BII)V
  */
 JNIEXPORT void JNICALL Java_org_rocksdb_RocksDB_deleteFilesInRange(
-  JNIEnv* env, jobject jdb, jlong jdb_handle, jbyteArray jbegin_key,
+  JNIEnv* env, jobject /*jdb*/, jlong jdb_handle, jbyteArray jbegin_key,
   jint jbegin_key_off, jint jbegin_key_len, jbyteArray jend_key,
   jint jend_key_off, jint jend_key_len) {
   auto* db = reinterpret_cast<rocksdb::DB*>(jdb_handle);
