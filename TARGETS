@@ -236,6 +236,7 @@ cpp_library(
         "utilities/blob_db/blob_log_writer.cc",
         "utilities/blob_db/ttl_extractor.cc",
         "utilities/cassandra/cassandra_compaction_filter.cc",
+        "utilities/cassandra/partition_meta_data.cc",
         "utilities/cassandra/format.cc",
         "utilities/cassandra/merge_operator.cc",
         "utilities/checkpoint/checkpoint_impl.cc",
@@ -398,6 +399,11 @@ ROCKS_TESTS = [
     [
         "cassandra_functional_test",
         "utilities/cassandra/cassandra_functional_test.cc",
+        "serial",
+    ],
+    [
+        "cassandra_partition_meta_data_test",
+        "utilities/cassandra/cassandra_partition_meta_data_test.cc",
         "serial",
     ],
     [
