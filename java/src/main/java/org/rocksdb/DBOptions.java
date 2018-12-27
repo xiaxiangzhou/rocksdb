@@ -958,6 +958,17 @@ public class DBOptions
     return avoidFlushDuringShutdown(nativeHandle_);
   }
 
+  public DBOptions setAllowIngestBehind(boolean allowIngestBehind) {
+    assert (isOwningHandle());
+    setAllowIngestBehind(nativeHandle_, allowIngestBehind);
+    return this;
+  }
+
+  public boolean allowIngestBehind() {
+    assert (isOwningHandle());
+    return allowIngestBehind(nativeHandle_);
+  }
+
   static final int DEFAULT_NUM_SHARD_BITS = -1;
 
 
@@ -1151,6 +1162,8 @@ public class DBOptions
   private native void setAvoidFlushDuringShutdown(final long handle,
       final boolean avoidFlushDuringShutdown);
   private native boolean avoidFlushDuringShutdown(final long handle);
+  private native boolean allowIngestBehind(final long handle);
+  private native void setAllowIngestBehind(final long handle, boolean allowIngestBehind);
 
   // instance variables
   // NOTE: If you add new member variables, please update the copy constructor above!

@@ -6026,6 +6026,29 @@ jboolean Java_org_rocksdb_DBOptions_avoidFlushDuringShutdown(JNIEnv* /*env*/,
   return static_cast<jboolean>(opt->avoid_flush_during_shutdown);
 }
 
+/*
+ * Class:     org_rocksdb_DBOptions
+ * Method:    allowIngestBehind
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_org_rocksd_DBOptions_allowIngestBehind(
+    JNIEnv* /*env*/, jobject /*obj*/, jlong jhandle) {
+  auto* opt = reinterpret_cast<rocksdb::DBOptions*>(jhandle);
+  return static_cast<bool>(opt->allow_ingest_behind);
+}
+
+/*
+ * Class:     org_rocksdb_DBOptions
+ * Method:    setAllowIngestBehind
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_DBOptions_setAllowIngestBehind(
+    JNIEnv* /*env*/, jobject /*obj*/, jlong jhandle,
+    jboolean jallow_ingest_behind) {
+  auto* opt = reinterpret_cast<rocksdb::DBOptions*>(jhandle);
+  opt->allow_ingest_behind = static_cast<bool>(jallow_ingest_behind);
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // rocksdb::WriteOptions
 
