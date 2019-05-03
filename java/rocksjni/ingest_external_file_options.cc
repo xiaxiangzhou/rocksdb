@@ -141,6 +141,33 @@ void Java_org_rocksdb_IngestExternalFileOptions_setAllowBlockingFlush(
 
 /*
  * Class:     org_rocksdb_IngestExternalFileOptions
+ * Method:    ingestBehind
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL
+Java_org_rocksdb_IngestExternalFileOptions_ingestBehind(JNIEnv* /*env*/,
+                                                        jobject /*obj*/,
+                                                        jlong jhandle) {
+  auto* options =
+      reinterpret_cast<rocksdb::IngestExternalFileOptions*>(jhandle);
+  return static_cast<jboolean>(options->ingest_behind);
+}
+
+/*
+ * Class:     org_rocksdb_IngestExternalFileOptions
+ * Method:    setIngestBehind
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL
+Java_org_rocksdb_IngestExternalFileOptions_setIngestBehind(
+    JNIEnv* /*env*/, jobject /*jobj*/, jlong jhandle, jboolean jingest_behind) {
+  auto* options =
+      reinterpret_cast<rocksdb::IngestExternalFileOptions*>(jhandle);
+  options->ingest_behind = static_cast<bool>(jingest_behind);
+}
+
+/*
+ * Class:     org_rocksdb_IngestExternalFileOptions
  * Method:    disposeInternal
  * Signature: (J)V
  */

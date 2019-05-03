@@ -386,62 +386,97 @@ RowValue RowValue::Merge(std::vector<RowValue>&& values) {
   return RowValue(std::move(columns), last_modified_time);
 }
 
-const PartitionDeletion PartitionDeletion::kDefault(kDefaultLocalDeletionTime,
-                                                    kDefaultMarkedForDeleteAt);
-const std::size_t PartitionDeletion::kSize = sizeof(int32_t) + sizeof(int64_t);
+const std::size_t DeletionTime::kSize = sizeof(int32_t) + sizeof(int64_t);
+const DeletionTime DeletionTime::kLive(kDefaultLocalDeletionTime,
+                                       kDefaultMarkedForDeleteAt);
 
-PartitionDeletion::PartitionDeletion(int32_t local_deletion_time,
-                                     int64_t marked_for_delete_at)
-    : local_deletion_time_(local_deletion_time),
-      marked_for_delete_at_(marked_for_delete_at) {}
-
-std::chrono::time_point<std::chrono::system_clock>
-PartitionDeletion::MarkForDeleteAt() const {
-  return std::chrono::time_point<std::chrono::system_clock>(
-      std::chrono::microseconds(marked_for_delete_at_));
-}
-
-std::chrono::time_point<std::chrono::system_clock>
-PartitionDeletion::LocalDeletionTime() const {
-  return std::chrono::time_point<std::chrono::system_clock>(
-      std::chrono::seconds(local_deletion_time_));
-}
-
-PartitionDeletion PartitionDeletion::Deserialize(const char* src,
-                                                 std::size_t size) {
-  if (size < kSize) {
-    return PartitionDeletion::kDefault;
-  }
-
-  int32_t local_deletion_time =
-      rocksdb::cassandra::Deserialize<int32_t>(src, 0);
-  int64_t marked_for_delete_at =
-      rocksdb::cassandra::Deserialize<int64_t>(src, sizeof(int32_t));
-  return PartitionDeletion(local_deletion_time, marked_for_delete_at);
-}
-
-void PartitionDeletion::Serialize(std::string* dest) const {
+void DeletionTime::Serialize(std::string* dest) const {
   rocksdb::cassandra::Serialize<int32_t>(local_deletion_time_, dest);
   rocksdb::cassandra::Serialize<int64_t>(marked_for_delete_at_, dest);
 }
 
-// Merge multiple PartitionDeletion only keep latest one
-PartitionDeletion PartitionDeletion::Merge(
-    std::vector<PartitionDeletion>&& pds) {
-  assert(pds.size() > 0);
-  PartitionDeletion candidate = kDefault;
-  for (auto& deletion : pds) {
-    if (deletion.Supersedes(candidate)) {
-      candidate = deletion;
-    }
-  }
-  return candidate;
+const DeletionTime DeletionTime::Deserialize(const char* src) {
+  int32_t local_deletion_time =
+      rocksdb::cassandra::Deserialize<int32_t>(src, 0);
+  int64_t marked_for_delete_at =
+      rocksdb::cassandra::Deserialize<int64_t>(src, sizeof(int32_t));
+  return DeletionTime(local_deletion_time, marked_for_delete_at);
 }
 
-bool PartitionDeletion::Supersedes(PartitionDeletion& pd) const {
-  return MarkForDeleteAt() > pd.MarkForDeleteAt() ||
-         (MarkForDeleteAt() == pd.MarkForDeleteAt() &&
-          LocalDeletionTime() > pd.LocalDeletionTime());
+PartitionDeletion::PartitionDeletion(const Slice& partition_key,
+                                     const DeletionTime& deletion_time)
+    : partition_key_(partition_key), deletion_time_(deletion_time) {}
+
+PartitionDeletion::PartitionDeletion(const PartitionDeletion& pd)
+    : partition_key_(pd.partition_key_), deletion_time_(pd.deletion_time_) {}
+
+const DeletionTime& PartitionDeletion::GetDeletionTime() const {
+  return deletion_time_;
+}
+
+const Slice PartitionDeletion::PartitionKey() const { return partition_key_; }
+
+PartitionDeletions PartitionDeletion::Deserialize(const char* src,
+                                                  std::size_t size) {
+  std::size_t offset = 0;
+  PartitionDeletions rets;
+
+  while (offset < size) {
+    if ((size - offset) < sizeof(int32_t)) break;
+    int32_t pk_length = rocksdb::cassandra::Deserialize<int32_t>(src, offset);
+    offset += sizeof(int32_t);
+
+    if ((size - offset) < (std::size_t)pk_length) break;
+    Slice pk = Slice(src + offset, pk_length);
+    offset += pk_length;
+
+    if ((size - offset) < DeletionTime::kSize) break;
+    DeletionTime deletion_time = DeletionTime::Deserialize(src + offset);
+    offset += DeletionTime::kSize;
+
+    std::unique_ptr<PartitionDeletion> pd(
+        new PartitionDeletion(pk, deletion_time));
+    rets.push_back(std::move(pd));
+  }
+  return rets;
+}
+
+void PartitionDeletion::Serialize(PartitionDeletions&& pds, std::string* dest) {
+  for (auto& pd : pds) {
+    rocksdb::cassandra::Serialize<int32_t>((int32_t)pd->partition_key_.size(),
+                                           dest);
+    dest->append(pd->partition_key_.data(), pd->partition_key_.size());
+    pd->GetDeletionTime().Serialize(dest);
+  }
+}
+
+// Merge multiple PartitionDeletion only keep latest one per partition key
+PartitionDeletions PartitionDeletion::Merge(PartitionDeletions&& pds) {
+  PartitionDeletions rets;
+  // most time merge endup with one result unless token hash collision
+  rets.reserve(1);
+
+  for (auto& deletion : pds) {
+    bool merged = false;
+    for (std::size_t i = 0; i < rets.size(); i++) {
+      if (rets[i]->partition_key_ == deletion->partition_key_) {
+        if (deletion->Supersedes(rets[i])) {
+          rets[i] = std::move(deletion);
+        }
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) {
+      rets.push_back(std::move(deletion));
+    }
+  }
+  return rets;
+}
+
+bool PartitionDeletion::Supersedes(
+    std::unique_ptr<PartitionDeletion>& pd) const {
+  return deletion_time_.Supersedes(pd->deletion_time_);
 }
 
 } // namepsace cassandrda
