@@ -48,7 +48,7 @@ jlong Java_org_rocksdb_BlockBasedTableConfig_newTableFactoryHandle(
     jboolean pin_l0_filter_and_index_blocks_in_cache,
     jboolean hash_index_allow_collision, jlong block_cache_compressed_size,
     jint block_cache_compressd_num_shard_bits, jbyte jchecksum_type,
-    jbyte jindex_type, jint jformat_version) {
+    jbyte jindex_type, jboolean partition_filters, jint jformat_version) {
   rocksdb::BlockBasedTableOptions options;
   options.no_block_cache = no_block_cache;
 
@@ -91,6 +91,7 @@ jlong Java_org_rocksdb_BlockBasedTableConfig_newTableFactoryHandle(
   options.checksum = static_cast<rocksdb::ChecksumType>(jchecksum_type);
   options.index_type =
       static_cast<rocksdb::BlockBasedTableOptions::IndexType>(jindex_type);
+  options.partition_filters = partition_filters;
   options.format_version = jformat_version;
 
   return reinterpret_cast<jlong>(rocksdb::NewBlockBasedTableFactory(options));

@@ -387,6 +387,26 @@ public class BlockBasedTableConfig extends TableFormatConfig {
   }
 
   /**
+   * Sets to use paritioned filters
+   *
+   * @param value on or off
+   * @return the reference to the current option.
+   */
+  public BlockBasedTableConfig setPartitionFilters(final boolean value) {
+    partitionFilters_ = value;
+    return this;
+  }
+
+  /**
+   *
+   * @return whether to partition filters
+   */
+  public boolean partitionFilters() {
+    return partitionFilters_;
+  }
+
+
+  /**
    * <p>We currently have three versions:</p>
    *
    * <ul>
@@ -424,8 +444,6 @@ public class BlockBasedTableConfig extends TableFormatConfig {
     return formatVersion_;
   }
 
-
-
   @Override protected long newTableFactoryHandle() {
     long filterHandle = 0;
     if (filter_ != null) {
@@ -442,7 +460,7 @@ public class BlockBasedTableConfig extends TableFormatConfig {
         wholeKeyFiltering_, filterHandle, cacheIndexAndFilterBlocks_,
         pinL0FilterAndIndexBlocksInCache_, hashIndexAllowCollision_, blockCacheCompressedSize_,
         blockCacheCompressedNumShardBits_, checksumType_.getValue(), indexType_.getValue(),
-        formatVersion_);
+        partitionFilters_, formatVersion_);
   }
 
   private native long newTableFactoryHandle(boolean noBlockCache, long blockCacheSize,
@@ -450,11 +468,13 @@ public class BlockBasedTableConfig extends TableFormatConfig {
       int blockRestartInterval, boolean wholeKeyFiltering, long filterPolicyHandle,
       boolean cacheIndexAndFilterBlocks, boolean pinL0FilterAndIndexBlocksInCache,
       boolean hashIndexAllowCollision, long blockCacheCompressedSize,
-      int blockCacheCompressedNumShardBits, byte checkSumType, byte indexType, int formatVersion);
+      int blockCacheCompressedNumShardBits, byte checkSumType, byte indexType, boolean partitionFilters,
+      int formatVersion);
 
   private boolean cacheIndexAndFilterBlocks_;
   private boolean pinL0FilterAndIndexBlocksInCache_;
   private IndexType indexType_;
+  private boolean partitionFilters_;
   private boolean hashIndexAllowCollision_;
   private ChecksumType checksumType_;
   private boolean noBlockCache_;
