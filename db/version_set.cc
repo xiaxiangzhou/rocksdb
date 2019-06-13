@@ -21,6 +21,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 #include "db/compaction.h"
 #include "db/internal_stats.h"
 #include "db/log_reader.h"
@@ -426,6 +427,7 @@ bool SomeFileOverlapsRange(
     const Slice* smallest_user_key,
     const Slice* largest_user_key) {
   const Comparator* ucmp = icmp.user_comparator();
+  std::cout << "whether disjoint_sorted_files: " << disjoint_sorted_files << std::endl;
   if (!disjoint_sorted_files) {
     // Need to check against all files
     for (size_t i = 0; i < file_level.num_files; i++) {
@@ -447,13 +449,22 @@ bool SomeFileOverlapsRange(
     InternalKey small;
     small.SetMinPossibleForUserKey(*smallest_user_key);
     index = FindFile(icmp, file_level, small.Encode());
+    std::cout << "smallest user key in or before file index:" << index
+                << ", with packed_number_and_path_id "
+                << file_level.files[index].fd.packed_number_and_path_id
+                << std::endl;
   }
 
+  std::cout << "this file level have num of files:" << file_level.num_files << std::endl;
   if (index >= file_level.num_files) {
     // beginning of range is after all files, so no overlap.
     return false;
   }
 
+  std::cout << "Check before file....." << std::endl;
+  std::cout << "File with index " << index << " have smallest user key " << ExtractUserKey(file_level.files[index].smallest_key).ToString(true) << std::endl;
+  std::cout << "File with index " << index << " have largest user key " << ExtractUserKey(file_level.files[index].largest_key).ToString(true) << std::endl;
+  std::cout << "whether before file: " << BeforeFile(ucmp, largest_user_key, &file_level.files[index]) << std::endl;
   return !BeforeFile(ucmp, largest_user_key, &file_level.files[index]);
 }
 

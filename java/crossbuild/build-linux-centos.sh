@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 
-set -e
+set -e -x
+
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
 
 # remove fixed relesever variable present in the hanscode boxes
 sudo rm -f /etc/yum/vars/releasever
 
 # enable EPEL
 sudo yum -y install epel-release
+
+# trusted ca certs from centos6 does not include epel's cert
+sudo sed -ri 's/(mirrorlist=http)s/\1/' /etc/yum.repos.d/epel.repo
 
 # install all required packages for rocksdb that are available through yum
 sudo yum -y install openssl java-1.7.0-openjdk-devel zlib-devel bzip2-devel lz4-devel snappy-devel libzstd-devel jemalloc-devel

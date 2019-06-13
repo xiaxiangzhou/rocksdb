@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include "db/version_edit.h"
 #include "table/merging_iterator.h"
@@ -513,6 +514,8 @@ Status ExternalSstFileIngestionJob::CheckLevelForIngestedBehindFile(
   auto* vstorage = cfd_->current()->storage_info();
   // first check if new files fit in the bottommost level
   int bottom_lvl = cfd_->NumberLevels() - 1;
+  std::cout << "check whether new file fit in the bottommost level: level " << bottom_lvl << std::endl;
+
   if(!IngestedFileFitInLevel(file_to_ingest, bottom_lvl)) {
     return Status::InvalidArgument(
       "Can't ingest_behind file as it doesn't fit "
@@ -573,6 +576,7 @@ Status ExternalSstFileIngestionJob::AssignGlobalSeqnoForIngestedFile(
 
 bool ExternalSstFileIngestionJob::IngestedFileFitInLevel(
     const IngestedFileInfo* file_to_ingest, int level) {
+  std::cout << "Going to ingest file: " << file_to_ingest->external_file_path << " in level: " << level << std::endl;
   if (level == 0) {
     // Files can always fit in L0
     return true;
@@ -581,17 +585,21 @@ bool ExternalSstFileIngestionJob::IngestedFileFitInLevel(
   auto* vstorage = cfd_->current()->storage_info();
   Slice file_smallest_user_key(file_to_ingest->smallest_user_key);
   Slice file_largest_user_key(file_to_ingest->largest_user_key);
+  std::cout << "file " << file_to_ingest->external_file_path << " have smallest user key: " << file_smallest_user_key.ToString(true) << std::endl;
+  std::cout << "file " << file_to_ingest->external_file_path << " have largest user key:" << file_largest_user_key.ToString(true) << std::endl;
 
   if (vstorage->OverlapInLevel(level, &file_smallest_user_key,
                                &file_largest_user_key)) {
     // File overlap with another files in this level, we cannot
     // add it to this level
+    std::cout << "file " << file_to_ingest->external_file_path << ", Refuse Injest: Overlap with another files in this level!" << std::endl;
     return false;
   }
   if (cfd_->RangeOverlapWithCompaction(file_smallest_user_key,
                                        file_largest_user_key, level)) {
     // File overlap with a running compaction output that will be stored
     // in this level, we cannot add this file to this level
+    std::cout << "file " << file_to_ingest->external_file_path << ", Refuse Injest: Overlap with a running compaction output that will be stored in this level!" << std::endl;
     return false;
   }
 
